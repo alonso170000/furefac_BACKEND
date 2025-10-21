@@ -8,5 +8,9 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mysql": "^2.18.1"
-  }
+  },
+  "scripts": {
+  "dev": "nodemon index.js",
+  "start": "node index.js"
+}
 }
