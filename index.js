@@ -27,6 +27,10 @@ app.use('/api/productos', require('./routes/productos.routes'));
 app.use('/api/cotizaciones', require('./routes/cotizaciones.routes'));
 app.use('/api/comentarios', require('./routes/comentarios.routes'));
 app.use('/api/contactos', require('./routes/contactos.routes'));
+app.use('/api/roles', require('./routes/roles.routes'));
+app.use('/api/secciones', require('./routes/secciones.routes'));
+app.use('/api/permisos', require('./routes/permisos.routes'));
+
 
 const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {

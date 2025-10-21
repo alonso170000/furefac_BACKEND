@@ -1,7 +1,7 @@
 // routes/contactos.routes.js
 const { Router } = require('express');
 const { pool } = require('../config/config.db.js');
-const { authRequired, allowRoles } = require('../middleware/auth');
+const { authRequired, allowRoles } = require('../middleware/auth.js');
 
 const router = Router();
 

@@ -3,7 +3,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/config.db.js');
-const { authRequired, allowRoles } = require('../middleware/auth');
+const { authRequired, allowRoles } = require('../middleware/auth.js');
 
 const router = Router();
 
