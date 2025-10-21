@@ -1,6 +1,6 @@
 // routes/comentarios.routes.js
 const { Router } = require('express');
-const { pool } = require('../config/config.db');
+const { pool } = require('../config/config.db.js');
 const { authRequired, allowRoles } = require('../middleware/auth');
 
 const router = Router();
