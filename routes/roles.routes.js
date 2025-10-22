@@ -11,7 +11,7 @@ router.get('/', authRequired, allowRoles('superadmin','admin'), async (_req, res
 });
 
 // Crear rol
-router.post('/', authRequired, allowRoles('superadmin'), async (req, res) => {
+router.post('/', authRequired, allowRoles('superadmin,admin'), async (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.status(400).json({ message: 'nombre requerido' });
   try {

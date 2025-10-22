@@ -26,7 +26,7 @@ router.get('/:rolId', authRequired, allowRoles('superadmin','admin'), async (req
  * POST /api/permisos/:rolId/init
  * Inicializa permisos en 0 para TODAS las secciones que no existan para ese rol
  */
-router.post('/:rolId/init', authRequired, allowRoles('superadmin'), async (req, res) => {
+router.post('/:rolId/init', authRequired, allowRoles('superadmin,admin'), async (req, res) => {
   const rolId = Number(req.params.rolId);
   await pool.query(
     `INSERT IGNORE INTO rol_permisos (rol_id, seccion_id)
