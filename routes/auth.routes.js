@@ -42,25 +42,48 @@ router.post('/register', authRequired, allowRoles('superadmin','admin'), async (
   }
 });
 
-// Login
+// Login híbrido: acepta usuario O correo
 router.post('/login', async (req, res) => {
   try {
-    const { usuario, password } = req.body;
-    if (!usuario || !password) return res.status(400).json({ message: 'Credenciales incompletas' });
+    // puedes mandar cualquiera:
+    // { "usuario": "...", "password": "..." }
+    // { "correo":  "...", "password": "..." }
+    // o un solo campo "identificador": { "identificador": "...", "password": "..." }
+    const { usuario, correo, identificador, password } = req.body;
 
+    const idRaw = (identificador ?? usuario ?? correo ?? '').toString().trim();
+    if (!idRaw || !password) {
+      return res.status(400).json({ message: 'Credenciales incompletas (usuario/correo y contraseña requeridos)' });
+    }
+
+    // Normaliza si parece correo
+    const looksEmail = idRaw.includes('@');
+    const idNorm = looksEmail ? idRaw.toLowerCase() : idRaw;
+
+    // Busca tanto por usuario como por correo (seguro y flexible)
     const rows = await pool.query(
-      'SELECT id, usuario, nombre, apellido, correo, password_hash, rol_id, activo FROM usuarios WHERE usuario = ?',
-      [usuario]
+      `SELECT id, usuario, nombre, apellido, correo, password_hash, rol_id, activo
+       FROM usuarios
+       WHERE usuario = ? OR LOWER(correo) = ? 
+       LIMIT 1`,
+      [idNorm, idNorm]
     );
-    if (!rows.length) return res.status(401).json({ message: 'Usuario/contraseña inválidos' });
+
+    if (!rows.length) {
+      return res.status(401).json({ message: 'Usuario/correo o contraseña inválidos' });
+    }
 
     const u = rows[0];
-    if (!u.activo) return res.status(403).json({ message: 'Usuario inactivo' });
+    if (!u.activo) {
+      return res.status(403).json({ message: 'Usuario inactivo' });
+    }
 
     const ok = await bcrypt.compare(password, u.password_hash);
-    if (!ok) return res.status(401).json({ message: 'Usuario/contraseña inválidos' });
+    if (!ok) {
+      return res.status(401).json({ message: 'Usuario/correo o contraseña inválidos' });
+    }
 
-    const rol = nombreRol(u.rol_id); // ← nombre para el middleware
+    const rol = nombreRol(u.rol_id); // mapea 1..4 → superadmin/admin/editor/lector
     const token = jwt.sign(
       { id: u.id, usuario: u.usuario, rol_id: u.rol_id, rol },
       process.env.JWT_SECRET,
@@ -80,9 +103,11 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (e) {
+    console.error(e);
     res.status(500).json({ message: 'Error al iniciar sesión', error: String(e) });
   }
 });
+
 
 // Yo (perfil)
 router.get('/me', authRequired, async (req, res) => {
