@@ -2,6 +2,7 @@
 const { Router } = require('express');
 const { pool } = require('../config/config.db.js');
 const { authRequired, allowRoles } = require('../middleware/auth.js');
+const { permiso } = require("../middleware/permisos.js");
 
 const router = Router();
 
@@ -28,7 +29,12 @@ router.get('/', async (req, res) => {
 });
 
 // Crear
-router.post('/', authRequired, allowRoles('superadmin','admin','editor'), async (req, res) => {
+// POST /api/productos
+router.post('/', 
+  authRequired,
+  permiso("productos", "crear"),
+  crearProductoHandler,
+  async (req, res) => {
   const { nombre, descripcion = null, precio_mxn, categoria_id, activo = 1 } = req.body;
   if (!nombre || precio_mxn == null || !categoria_id) {
     return res.status(400).json({ message: 'nombre, precio_mxn, categoria_id son requeridos' });
