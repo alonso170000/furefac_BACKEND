@@ -1,19 +1,14 @@
 // config/config.db.js
-require('dotenv').config();
-const mysql = require('mysql');
-const util = require('util');
+const mysql = require("mysql2/promise");
 
 const pool = mysql.createPool({
-  host: process.env.DBHOST,
-  user: process.env.DBUSER,
-  password: process.env.DBPASS,
-  database: process.env.DBNAME,
-  port: process.env.DBPORT ? Number(process.env.DBPORT) : 3306,
-  connectionLimit: 10,
-  timezone: 'Z'
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "furefac",
+  waitForConnections: true,
+  connectionLimit: 15,
+  queueLimit: 0,
 });
-
-// Promisify para usar async/await
-pool.query = util.promisify(pool.query);
 
 module.exports = { pool };

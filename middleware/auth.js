@@ -1,28 +1,31 @@
 // middleware/auth.js
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
+const { pool } = require("../config/config.db.js");
 
-function authRequired(req, res, next) {
+async function authRequired(req, res, next) {
   try {
-    const header = req.headers.authorization || '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-    if (!token) return res.status(401).json({ message: 'Token requerido' });
+    const hdr = req.headers.authorization || "";
+    const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
+    if (!token) return res.status(401).json({ message: "No autenticado" });
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload; // { id, usuario, rol_id, rol }  ← incluye 'rol' (nombre)
+    // payload debe traer userId (o como lo hayas llamado)
+    const [rows] = await pool.query(
+      `SELECT u.id, u.usuario, u.rol_id, r.nombre AS rol_nombre
+       FROM usuarios u
+       JOIN roles r ON r.id = u.rol_id
+       WHERE u.id=? AND u.activo=1
+       LIMIT 1`,
+      [payload.id]
+    );
+    if (!rows.length) return res.status(401).json({ message: "Usuario inactivo o inválido" });
+
+    req.usuario = rows[0];
     next();
-  } catch {
-    return res.status(401).json({ message: 'Token inválido o expirado' });
+  } catch (e) {
+    console.error(e);
+    res.status(401).json({ message: "Token inválido" });
   }
 }
 
-// ✅ compara por NOMBRE (coincide con allowRoles('superadmin','admin'))
-function allowRoles(...roles) {
-  return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.rol)) {
-      return res.status(403).json({ message: 'Permisos insuficientes' });
-    }
-    next();
-  };
-}
-
-module.exports = { authRequired, allowRoles };
+module.exports = { authRequired };

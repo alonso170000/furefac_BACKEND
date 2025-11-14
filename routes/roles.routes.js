@@ -9,7 +9,7 @@ router.get("/roles",
   authRequired,
   permiso("configuracion","reporte"), // o el que definas para gestionar roles
   async (req, res) => {
-    const rows = await pool.query("SELECT id, nombre, creado_en FROM roles ORDER BY id ASC");
+    const [rows] = await pool.query("SELECT id, nombre, creado_en FROM roles ORDER BY id ASC");
     res.json(rows);
   }
 );
@@ -21,8 +21,8 @@ router.post("/roles",
   async (req, res) => {
     const { nombre } = req.body;
     if (!nombre) return res.status(400).json({ message: "Nombre requerido" });
-    const r = await pool.query("INSERT INTO roles (nombre) VALUES (?)", [nombre]);
-    res.status(201).json({ id: r.insertId, message: "Rol creado" });
+    const [result] = await pool.query("INSERT INTO roles (nombre) VALUES (?)", [nombre]);
+    res.status(201).json({ id: result.insertId, message: "Rol creado" });
   }
 );
 
@@ -32,8 +32,8 @@ router.get("/roles/:id/permisos",
   permiso("configuracion","reporte"),
   async (req, res) => {
     const rolId = req.params.id;
-    const secciones = await pool.query("SELECT id, nombre FROM secciones ORDER BY id");
-    const perms = await pool.query(
+    const [secciones] = await pool.query("SELECT id, nombre FROM secciones ORDER BY id");
+    const [perms] = await pool.query(
       "SELECT seccion_id, puede_crear, puede_editar, puede_eliminar, puede_reporte FROM rol_permisos WHERE rol_id=?",
       [rolId]
     );

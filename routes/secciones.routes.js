@@ -1,17 +1,18 @@
 const { Router } = require('express');
 const { pool } = require('../config/config.db.js');
-const { authRequired, allowRoles } = require('../middleware/auth.js');
+const { authRequired } = require('../middleware/auth.js');
+const { permiso } = require('../middleware/permisos.js');
 
 const router = Router();
 
 // Listar secciones
-router.get('/', authRequired, allowRoles('superadmin','admin','editor','lector'), async (_req, res) => {
-  const rows = await pool.query('SELECT id, nombre FROM secciones ORDER BY id ASC');
+router.get('/', authRequired, permiso('configuracion','reporte'), async (_req, res) => {
+  const [rows] = await pool.query('SELECT id, nombre FROM secciones ORDER BY id ASC');
   res.json(rows);
 });
 
 // Crear sección
-router.post('/', authRequired, allowRoles('superadmin'), async (req, res) => {
+router.post('/', authRequired, permiso('configuracion','crear'), async (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.status(400).json({ message: 'nombre requerido' });
   try {
@@ -24,7 +25,7 @@ router.post('/', authRequired, allowRoles('superadmin'), async (req, res) => {
 });
 
 // Actualizar sección
-router.put('/:id', authRequired, allowRoles('superadmin'), async (req, res) => {
+router.put('/:id', authRequired, permiso('configuracion','editar'), async (req, res) => {
   const { nombre } = req.body;
   if (!nombre) return res.status(400).json({ message: 'nombre requerido' });
   await pool.query('UPDATE secciones SET nombre=? WHERE id=?', [nombre, req.params.id]);
@@ -32,7 +33,7 @@ router.put('/:id', authRequired, allowRoles('superadmin'), async (req, res) => {
 });
 
 // Eliminar sección (borra permisos por ON DELETE CASCADE)
-router.delete('/:id', authRequired, allowRoles('superadmin'), async (req, res) => {
+router.delete('/:id', authRequired, permiso('configuracion','eliminar'), async (req, res) => {
   await pool.query('DELETE FROM secciones WHERE id=?', [req.params.id]);
   res.json({ message: 'Sección eliminada' });
 });

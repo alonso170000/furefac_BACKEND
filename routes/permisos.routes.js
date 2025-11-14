@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { pool } = require('../config/config.db.js');
-const { authRequired, allowRoles } = require('../middleware/auth.js');
+const { authRequired } = require('../middleware/auth.js');
+const { permiso } = require('../middleware/permisos.js');
 
 const router = Router();
 
@@ -8,9 +9,9 @@ const router = Router();
  * GET /api/permisos/:rolId
  * Lista permisos de un rol (con nombre de sección)
  */
-router.get('/:rolId', authRequired, allowRoles('superadmin','admin'), async (req, res) => {
+router.get('/:rolId', authRequired, permiso('configuracion','reporte'), async (req, res) => {
   const rolId = Number(req.params.rolId);
-  const rows = await pool.query(
+  const [rows] = await pool.query(
     `SELECT rp.id, rp.rol_id, rp.seccion_id, s.nombre AS seccion,
             rp.puede_crear, rp.puede_editar, rp.puede_eliminar, rp.puede_reporte
      FROM rol_permisos rp
@@ -26,7 +27,7 @@ router.get('/:rolId', authRequired, allowRoles('superadmin','admin'), async (req
  * POST /api/permisos/:rolId/init
  * Inicializa permisos en 0 para TODAS las secciones que no existan para ese rol
  */
-router.post('/:rolId/init', authRequired, allowRoles('superadmin,admin'), async (req, res) => {
+router.post('/:rolId/init', authRequired, permiso('configuracion','editar'), async (req, res) => {
   const rolId = Number(req.params.rolId);
   await pool.query(
     `INSERT IGNORE INTO rol_permisos (rol_id, seccion_id)
@@ -39,7 +40,7 @@ router.post('/:rolId/init', authRequired, allowRoles('superadmin,admin'), async 
  * PUT /api/permisos/:permId
  * Actualiza un permiso específico
  */
-router.put('/:permId', authRequired, allowRoles('superadmin','admin'), async (req, res) => {
+router.put('/:permId', authRequired, permiso('configuracion','editar'), async (req, res) => {
   const { puede_crear, puede_editar, puede_eliminar, puede_reporte } = req.body;
   await pool.query(
     `UPDATE rol_permisos
@@ -64,7 +65,7 @@ router.put('/:permId', authRequired, allowRoles('superadmin','admin'), async (re
  * POST /api/permisos/:rolId/bulk
  * Reemplaza los permisos de un rol con un arreglo [{seccion_id, puede_crear, puede_editar, puede_eliminar, puede_reporte}]
  */
-router.post('/:rolId/bulk', authRequired, allowRoles('superadmin'), async (req, res) => {
+router.post('/:rolId/bulk', authRequired, permiso('configuracion','editar'), async (req, res) => {
   const rolId = Number(req.params.rolId);
   const items = Array.isArray(req.body) ? req.body : [];
   if (!items.length) return res.status(400).json({ message: 'Arreglo de permisos requerido' });
@@ -96,9 +97,9 @@ router.post('/:rolId/bulk', authRequired, allowRoles('superadmin'), async (req, 
  * GET /api/permisos/menu/:rolId
  * Devuelve un objeto de "menú" por secciones con flags para el frontend
  */
-router.get('/menu/:rolId', authRequired, allowRoles('superadmin','admin','editor','lector'), async (req, res) => {
+router.get('/menu/:rolId', authRequired, permiso('configuracion','reporte'), async (req, res) => {
   const rolId = Number(req.params.rolId);
-  const rows = await pool.query(
+  const [rows] = await pool.query(
     `SELECT s.nombre AS seccion, rp.puede_crear, rp.puede_editar, rp.puede_eliminar, rp.puede_reporte
      FROM secciones s
      LEFT JOIN rol_permisos rp ON rp.seccion_id = s.id AND rp.rol_id = ?
