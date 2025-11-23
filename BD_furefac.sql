@@ -53,7 +53,7 @@ INSERT INTO secciones (nombre) VALUES
 ('configuracion');
 
 INSERT INTO usuarios (usuario, nombre, apellido, correo, password_hash, rol_id)
-VALUES ('superadmin', 'Administrador', 'Principal', 'admin@furefac.com', 'hash_superseguro', 1);
+VALUES ('superadmin', 'Administrador', 'Principal', 'admin@furefac.com', '$2a$12$7jtsviZfHfydai8y5k8pc.DABFnlUTs0zwhX4UHXqo0r30PD6zIwy', 1);
 
 CREATE TABLE categorias (
   id        BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -79,7 +79,7 @@ CREATE TABLE productos (
 CREATE TABLE producto_imagenes (
   id           BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   producto_id  BIGINT UNSIGNED NOT NULL,
-  ruta         VARCHAR(255) NOT NULL,
+  ruta         MEDIUMTEXT NOT NULL,
   orden        TINYINT UNSIGNED NOT NULL DEFAULT 1,
   creado_en    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_img_prod (producto_id),

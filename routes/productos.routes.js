@@ -13,9 +13,15 @@ router.get("/", async (req,res)=>{
   if (q) { where.push("p.nombre LIKE ?"); params.push(`%${q}%`); }
   if (categoria_id) { where.push("p.categoria_id=?"); params.push(categoria_id); }
   if (activo !== undefined && activo !== "") { where.push("p.activo=?"); params.push(Number(activo)); }
-  const sql = `SELECT p.*, c.nombre AS categoria
-               FROM productos p JOIN categorias c ON c.id=p.categoria_id
+  const sql = `SELECT p.*,
+                      c.nombre AS categoria,
+                      (SELECT ruta FROM producto_imagenes pi2 WHERE pi2.producto_id = p.id ORDER BY pi2.orden ASC, pi2.id ASC LIMIT 1) AS imagen,
+                      GROUP_CONCAT(pi.ruta ORDER BY pi.orden ASC, pi.id ASC SEPARATOR '||') AS imagenes
+               FROM productos p
+               JOIN categorias c ON c.id=p.categoria_id
+               LEFT JOIN producto_imagenes pi ON pi.producto_id = p.id
                ${where.length?`WHERE ${where.join(" AND ")}`:""}
+               GROUP BY p.id
                ORDER BY p.creado_en DESC`;
   const [rows] = await pool.query(sql, params);
   res.json(rows);
