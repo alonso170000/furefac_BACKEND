@@ -32,6 +32,7 @@ router.post("/", async (req, res) => {
     producto_categoria_snap = null,
     producto_descripcion_snap = null,
     cantidad_solicitada = 1,
+    imagenes = [],
     estado = "pendiente",
   } = req.body;
 
@@ -48,7 +49,7 @@ router.post("/", async (req, res) => {
   const precioSnap = nullableNumber(producto_precio_snap);
   const productoId = nullableNumber(producto_id);
 
-  await pool.query(
+  const [result] = await pool.query(
     `INSERT INTO cotizaciones
      (producto_id, nombre_usuario, correo, telefono, descripcion,
       producto_nombre_snap, producto_precio_snap, producto_categoria_snap,
@@ -69,7 +70,25 @@ router.post("/", async (req, res) => {
     ]
   );
 
-  res.status(201).json({ message: "Cotización enviada" });
+  const cotizacionId = result.insertId;
+
+  if (Array.isArray(imagenes) && imagenes.length) {
+    const primeras = imagenes.slice(0, 5);
+    for (let i = 0; i < primeras.length; i++) {
+      const ruta = primeras[i];
+      if (!ruta) continue;
+      try {
+        await pool.query(
+          "INSERT INTO cotizacion_imagenes (cotizacion_id, ruta, orden) VALUES (?,?,?)",
+          [cotizacionId, ruta, i + 1]
+        );
+      } catch {
+        // continuar aunque falle alguna imagen
+      }
+    }
+  }
+
+  res.status(201).json({ id: cotizacionId, message: "Cotizacion enviada" });
 });
 
 // Buzón (vista)
@@ -293,3 +312,4 @@ router.delete("/:id", authRequired, permiso("cotizaciones", "eliminar"), async (
 });
 
 module.exports = router;
+

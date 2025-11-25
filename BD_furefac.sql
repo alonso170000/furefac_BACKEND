@@ -119,7 +119,7 @@ CREATE TABLE cotizaciones (
 CREATE TABLE cotizacion_imagenes (
   id             BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   cotizacion_id  BIGINT UNSIGNED NOT NULL,
-  ruta           VARCHAR(255) NOT NULL,
+  ruta           LONGTEXT NOT NULL,
   orden          TINYINT UNSIGNED NOT NULL DEFAULT 1,
   creado_en      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_cimg_cot (cotizacion_id),
