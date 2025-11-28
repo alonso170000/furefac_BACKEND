@@ -28,13 +28,13 @@ app.use('/api/producto-imagenes', require('./routes/productoImagenes.routes'));
 app.use('/api/cotizaciones', require('./routes/cotizaciones.routes'));
 app.use('/api/comentarios', require('./routes/comentarios.routes'));
 app.use('/api/contactos', require('./routes/contactos.routes'));
+app.use('/api/notificaciones', require('./routes/notificaciones.routes')); // ✅ AGREGAR ESTA LÍNEA
 app.use('/api/roles', require('./routes/roles.routes'));
 app.use('/api/secciones', require('./routes/secciones.routes'));
 app.use('/api/permisos', require('./routes/permisos.routes'));
 app.use('/api/usuarios', require('./routes/usuarios.routes'));
 app.use("/api", require("./routes/usuarios.roles.routes"));
 app.use("/api/historial", require("./routes/historial.routes"));
-
 
 const PORT = process.env.PORT || 3030;
 app.listen(PORT, () => {
