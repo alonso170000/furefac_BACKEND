@@ -3,8 +3,22 @@ const { Router } = require("express");
 const { pool } = require("../config/config.db.js");
 const { authRequired } = require("../middleware/auth.js");
 const { permiso } = require("../middleware/permisos.js");
+const nodemailer = require("nodemailer");
 
 const router = Router();
+
+function crearTransporter() {
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
+  if (!SMTP_HOST || !SMTP_PORT || !SMTP_USER || !SMTP_PASS) {
+    throw new Error("Configuraci\u00f3n SMTP incompleta");
+  }
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: Number(SMTP_PORT),
+    secure: Number(SMTP_PORT) === 465,
+    auth: { user: SMTP_USER, pass: SMTP_PASS },
+  });
+}
 
 router.get("/", authRequired, permiso("historial", "reporte"), async (_req, res) => {
   const [rows] = await pool.query("SELECT * FROM vw_historial_compras ORDER BY fecha DESC");
@@ -172,5 +186,53 @@ router.delete("/:id", authRequired, permiso("historial", "eliminar"), async (req
   if (!result.affectedRows) return res.status(404).json({ message: "Venta no encontrada" });
   res.json({ message: "Venta eliminada" });
 });
+
+// Reenviar recibo en PDF al correo del cliente
+router.post(
+  "/:id/reenviar-recibo",
+  authRequired,
+  permiso("historial", "reporte"),
+  async (req, res) => {
+    const { pdfBase64, correo } = req.body;
+    if (!pdfBase64 || !correo) {
+      return res.status(400).json({ message: "pdfBase64 y correo son requeridos" });
+    }
+
+    try {
+      // obtener venta
+      const [rows] = await pool.query(
+        `SELECT cliente_nombre, cliente_correo, folio FROM cotizacion_ventas WHERE id=?`,
+        [req.params.id]
+      );
+      if (!rows.length) return res.status(404).json({ message: "Venta no encontrada" });
+      const venta = rows[0];
+
+      // preparar buffer pdf
+      const base64Data = pdfBase64.includes(",")
+        ? pdfBase64.split(",")[1]
+        : pdfBase64.replace(/^data:application\/pdf[^,]*,/, "");
+      const pdfBuffer = Buffer.from(base64Data, "base64");
+
+      const transporter = crearTransporter();
+      await transporter.sendMail({
+        from: `"Furefac" <${process.env.SMTP_USER}>`,
+        to: correo || venta.cliente_correo,
+        subject: `Recibo de compra ${venta.folio || ""}`.trim(),
+        text: `Hola ${venta.cliente_nombre || ""}, te enviamos el recibo de tu compra.`,
+        attachments: [
+          {
+            filename: `recibo-${venta.folio || "compra"}.pdf`,
+            content: pdfBuffer,
+          },
+        ],
+      });
+
+      res.json({ message: "Recibo enviado" });
+    } catch (error) {
+      console.error("Error al reenviar recibo:", error);
+      res.status(500).json({ message: "No se pudo reenviar el recibo", error: String(error) });
+    }
+  }
+);
 
 module.exports = router;

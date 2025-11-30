@@ -87,7 +87,7 @@ router.post(
 router.put('/:id', authRequired, permiso('usuarios','editar'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { nombre, apellido, correo, rol_id, activo } = req.body;
+    const { nombre, apellido, correo, rol_id, activo, password } = req.body;
 
     // Validaciones básicas
     if (!id) return res.status(400).json({ message: 'ID de usuario requerido' });
@@ -101,6 +101,11 @@ router.put('/:id', authRequired, permiso('usuarios','editar'), async (req, res) 
     if (correo) { fields.push('correo = ?'); values.push(correo); }
     if (rol_id) { fields.push('rol_id = ?'); values.push(rol_id); }
     if (activo !== undefined) { fields.push('activo = ?'); values.push(activo); }
+    if (password && password.trim()) {
+      const hash = await bcrypt.hash(password, 10);
+      fields.push('password_hash = ?');
+      values.push(hash);
+    }
 
     if (!fields.length) {
       return res.status(400).json({ message: 'No se enviaron campos para actualizar' });
