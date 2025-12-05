@@ -175,6 +175,7 @@ CREATE TABLE contactos (
   nombre      VARCHAR(120) NOT NULL,
   numero      VARCHAR(30)  NOT NULL,
   correo      VARCHAR(120) NOT NULL,
+  activo      TINYINT(1)   NOT NULL DEFAULT 1,
   creado_en   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 

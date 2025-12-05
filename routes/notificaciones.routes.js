@@ -52,6 +52,10 @@ router.post('/enviar-compra', authRequired, permiso('cotizaciones', 'crear'), as
       return res.status(404).json({ message: 'Contacto no encontrado' });
     }
 
+    if (contactos[0].activo === 0) {
+      return res.status(400).json({ message: 'El contacto no esta activo para notificaciones' });
+    }
+
     const contacto = contactos[0];
     const resultados = { correo: null, sms: null };
 
@@ -117,6 +121,7 @@ router.get('/contactos-disponibles', authRequired, async (req, res) => {
     const [contactos] = await pool.query(`
       SELECT id, nombre, numero, correo 
       FROM contactos 
+      WHERE activo = 1
       ORDER BY nombre ASC
     `);
     res.json(contactos);

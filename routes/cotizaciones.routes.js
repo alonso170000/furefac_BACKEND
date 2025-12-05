@@ -3,6 +3,8 @@ const { Router } = require("express");
 const { pool } = require("../config/config.db.js");
 const { authRequired } = require("../middleware/auth.js");
 const { permiso } = require("../middleware/permisos.js");
+const nodemailer = require("nodemailer");
+const https = require("https");
 
 const router = Router();
 const ESTADOS_COTIZACION = new Set(["pendiente", "en_seguimiento", "no_comprado", "comprado"]);
@@ -17,6 +19,107 @@ function nullableNumber(value) {
   if (value === undefined || value === null || value === "") return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: parseInt(process.env.SMTP_PORT || "587", 10),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+  tls: { rejectUnauthorized: false },
+});
+
+function enviarWhatsApp(numero, mensaje) {
+  const numeroDestino = numero || process.env.WHATSAPP_DEFAULT_NUMBER;
+  if (!numeroDestino) {
+    console.log("SIMULACION - WhatsApp: sin numero destino configurado");
+    return Promise.resolve();
+  }
+
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_ID;
+  if (!token || !phoneId) {
+    console.log(`SIMULACION - WhatsApp enviado a ${numeroDestino}: ${mensaje}`);
+    return Promise.resolve();
+  }
+
+  const payload = JSON.stringify({
+    messaging_product: "whatsapp",
+    to: numeroDestino,
+    type: "text",
+    text: { body: mensaje },
+  });
+
+  const options = {
+    method: "POST",
+    hostname: "graph.facebook.com",
+    path: `/v20.0/${phoneId}/messages`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payload),
+    },
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      res.on("data", () => {});
+      res.on("end", () => resolve());
+    });
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  }).catch((err) => {
+    console.error("Error al enviar WhatsApp:", err.message);
+  });
+}
+
+async function enviarNotificacionesCotizacion(payload) {
+  try {
+    const [contactos] = await pool.query(
+      "SELECT nombre, numero, correo FROM contactos WHERE activo = 1"
+    );
+
+    if (!Array.isArray(contactos) || contactos.length === 0) return;
+
+    const asunto = "Nueva cotizacion registrada";
+    const cuerpo = `Hola,
+
+Hay una nueva cotizacion registrada:
+- Cliente: ${payload.nombre_usuario}
+- Telefono: ${payload.telefono || "N/A"}
+- Correo: ${payload.correo || "N/A"}
+- Descripcion: ${payload.descripcion || "N/A"}
+- Producto: ${payload.producto_nombre_snap || "N/A"}
+- Cantidad: ${payload.cantidad_solicitada || 1}
+
+Ingresa al panel para revisarla.`;
+
+    for (const contacto of contactos) {
+      if (contacto.correo) {
+        transporter
+          .sendMail({
+            from: `Fundacion <${process.env.SMTP_USER || 'no-reply@local'}>`,
+            to: contacto.correo,
+            subject: asunto,
+            text: cuerpo,
+          })
+          .catch((err) => console.error("Error al enviar correo de cotizacion:", err.message));
+      }
+
+      if (contacto.numero) {
+        await enviarWhatsApp(
+          contacto.numero,
+          `Nueva cotizacion: ${payload.nombre_usuario} (${payload.telefono || "sin telefono"})`
+        );
+      }
+    }
+  } catch (error) {
+    console.error("No se pudieron enviar notificaciones de cotizacion:", error.message);
+  }
 }
 
 // Crear cotización (público)
@@ -89,6 +192,15 @@ router.post("/", async (req, res) => {
   }
 
   res.status(201).json({ id: cotizacionId, message: "Cotizacion enviada" });
+
+  enviarNotificacionesCotizacion({
+    nombre_usuario,
+    correo,
+    telefono,
+    descripcion,
+    producto_nombre_snap,
+    cantidad_solicitada: cantidad,
+  });
 });
 
 // Buzón (vista)
