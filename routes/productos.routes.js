@@ -70,8 +70,90 @@ router.put("/:id",
 router.delete("/:id",
   authRequired, permiso("productos","eliminar"),
   async (req,res)=>{
-    await pool.query("DELETE FROM productos WHERE id=?", [req.params.id]);
+    const productoId = req.params.id;
+
+    // Revisar relaciones antes de eliminar
+    const [relRows] = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN c.estado IN ('pendiente','en_seguimiento') THEN 1 ELSE 0 END),0) AS cot_pendientes,
+         COALESCE(SUM(CASE WHEN c.estado = 'no_comprado' THEN 1 ELSE 0 END),0) AS cot_no_comprado,
+         COALESCE(SUM(CASE WHEN c.estado = 'comprado' THEN 1 ELSE 0 END),0) AS cot_comprado,
+         COALESCE(SUM(CASE WHEN cv.id IS NOT NULL THEN 1 ELSE 0 END),0) AS ventas
+       FROM cotizaciones c
+       LEFT JOIN cotizacion_ventas cv ON cv.cotizacion_id = c.id
+       WHERE c.producto_id = ?`,
+      [productoId]
+    );
+
+    const rel = relRows?.[0] || {};
+    const tieneVentas = Number(rel.ventas || 0) > 0 || Number(rel.cot_comprado || 0) > 0;
+    if (tieneVentas) {
+      return res.status(409).json({
+        message: "No se puede eliminar el producto porque tiene compras o cotizaciones marcadas como compradas. Desactivalo.",
+      });
+    }
+
+    // Cerrar cotizaciones abiertas y quitar la FK antes de eliminar
+    await pool.query(
+      `UPDATE cotizaciones
+       SET estado = 'no_comprado', producto_id = NULL, actualizado_en = CURRENT_TIMESTAMP
+       WHERE producto_id = ? AND estado IN ('pendiente','en_seguimiento','no_comprado')`,
+      [productoId]
+    );
+
+    await pool.query("DELETE FROM productos WHERE id=?", [productoId]);
     res.json({ message:"Producto eliminado" });
+  }
+);
+
+// Relaciones (cotizaciones / ventas) para un producto
+router.get("/:id/relaciones",
+  authRequired, permiso("productos","reporte"),
+  async (req, res) => {
+    const productoId = req.params.id;
+
+    const [prodRows] = await pool.query("SELECT id, activo FROM productos WHERE id = ?", [productoId]);
+    if (!prodRows.length) return res.status(404).json({ message: "Producto no encontrado" });
+
+    const [rows] = await pool.query(
+      `SELECT
+         COALESCE(SUM(CASE WHEN c.estado IN ('pendiente','en_seguimiento') THEN 1 ELSE 0 END),0) AS cot_pendientes,
+         COALESCE(SUM(CASE WHEN c.estado = 'no_comprado' THEN 1 ELSE 0 END),0) AS cot_no_comprado,
+         COALESCE(SUM(CASE WHEN c.estado = 'comprado' THEN 1 ELSE 0 END),0) AS cot_comprado,
+         COALESCE(SUM(CASE WHEN cv.id IS NOT NULL THEN 1 ELSE 0 END),0) AS ventas
+       FROM cotizaciones c
+       LEFT JOIN cotizacion_ventas cv ON cv.cotizacion_id = c.id
+       WHERE c.producto_id = ?`,
+      [productoId]
+    );
+
+    const stats = rows?.[0] || {};
+    res.json({
+      activo: prodRows[0].activo,
+      cot_pendientes: Number(stats.cot_pendientes || 0),
+      cot_no_comprado: Number(stats.cot_no_comprado || 0),
+      cot_comprado: Number(stats.cot_comprado || 0),
+      ventas: Number(stats.ventas || 0),
+    });
+  }
+);
+
+// Cerrar cotizaciones abiertas de un producto (marcarlas como no_comprado y desvincular producto)
+router.post("/:id/cerrar-cotizaciones",
+  authRequired, permiso("productos","editar"),
+  async (req, res) => {
+    const productoId = req.params.id;
+    const [prodRows] = await pool.query("SELECT id FROM productos WHERE id = ?", [productoId]);
+    if (!prodRows.length) return res.status(404).json({ message: "Producto no encontrado" });
+
+    const [result] = await pool.query(
+      `UPDATE cotizaciones
+       SET estado = 'no_comprado', producto_id = NULL, actualizado_en = CURRENT_TIMESTAMP
+       WHERE producto_id = ? AND estado IN ('pendiente','en_seguimiento','no_comprado')`,
+      [productoId]
+    );
+
+    res.json({ message: "Cotizaciones cerradas", afectadas: result.affectedRows || 0 });
   }
 );
 
